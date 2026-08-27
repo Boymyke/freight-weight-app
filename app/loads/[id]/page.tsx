@@ -68,11 +68,11 @@ export default function LoadDetailPage() {
           <div className="document-list">
             {documents.map(([key, label, short]) => {
               const done = load[key];
-              return <button className={`document-item ${done ? 'is-done' : ''}`} key={key} onClick={() => toggleDocument(load.id, key)}>
+              return <label className={`document-item ${done ? 'is-done' : ''}`} key={key}>
                 <span className="document-icon">{done ? <CheckCircle2 size={19}/> : <FileText size={19}/>}</span>
                 <span><strong>{label}</strong><small>{done ? 'Verified and attached' : 'Missing or needs review'}</small></span>
-                <em>{done ? 'Verified' : `Fix ${short}`}</em>
-              </button>;
+                <span className="document-check"><input type="checkbox" checked={done} onChange={() => toggleDocument(load.id, key)} aria-label={`Mark ${label} as verified`}/><i><Check size={13}/></i><em>{done ? 'Checked' : `Check ${short}`}</em></span>
+              </label>;
             })}
           </div>
         </article>
