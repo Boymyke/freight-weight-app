@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, ChevronDown, Command, Search, Share2, Sparkles, X } from 'lucide-react';
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Mail, Search, Share2, Sparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useDemo } from '@/lib/demo-store';
@@ -9,7 +9,7 @@ import { useDemo } from '@/lib/demo-store';
 const labels: Record<string, string> = {
   loads: 'Loads',
   exceptions: 'Exceptions',
-  revenue: 'Revenue recovery',
+  revenue: 'Invoices',
   analytics: 'Analytics',
   audit: 'Revenue audit',
   admin: 'Demo controls',
@@ -71,23 +71,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-shell">
-      <Sidebar/>
+      <Sidebar onSearch={() => setSearchOpen(true)}/>
       <section className="workspace-shell">
-        <header className="topbar">
-          <div className="breadcrumb"><span>{companyName}</span><i>/</i><strong>{page}</strong></div>
-          <button className="global-search" onClick={() => setSearchOpen(true)}>
-            <Search size={16}/><span>Search loads, customers, exceptions</span><kbd><Command size={12}/> K</kbd>
-          </button>
+        <header className="topbar reference-topbar">
+          <div className="reference-breadcrumb-row">
+            <div className="history-buttons">
+              <button className="icon-button icon-button--border" onClick={() => router.back()} aria-label="Go back"><ChevronLeft size={16}/></button>
+              <button className="icon-button icon-button--border" onClick={() => router.forward()} aria-label="Go forward"><ChevronRight size={16}/></button>
+            </div>
+            <div className="breadcrumb"><span>{companyName}</span><ChevronRight size={13}/><strong>{page}</strong></div>
+          </div>
+
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="Notifications">
-              <Bell size={18}/>{openExceptions.length > 0 && <i className="notification-dot"/>}
+            <button className="icon-button icon-button--border" onClick={() => setToast('Use Demo controls to configure a prospect scenario')} aria-label="Help"><CircleHelp size={17}/></button>
+            <button className="icon-button icon-button--border" onClick={() => setToast('Demo inbox has no external messages')} aria-label="Messages"><Mail size={17}/></button>
+            <button className="icon-button icon-button--border" onClick={() => setNotificationsOpen(value => !value)} aria-label="Notifications">
+              <Bell size={17}/>{openExceptions.length > 0 && <i className="notification-dot"/>}
             </button>
-            <button className="profile-chip" onClick={() => router.push('/admin')}><span>FD</span><ChevronDown size={14}/></button>
-            <button className="button button--dark button--sm" onClick={share}><Share2 size={15}/>Share demo</button>
+            <button className="profile-chip" onClick={() => router.push('/admin')}><span>FD</span><ChevronDown size={13}/></button>
+            <button className="reference-share-button" onClick={share}><Share2 size={15}/>Share</button>
           </div>
 
           {notificationsOpen && (
-            <div className="notification-popover">
+            <div className="notification-popover reference-popover">
               <div className="popover-head"><strong>Needs attention</strong><button onClick={() => setNotificationsOpen(false)}><X size={16}/></button></div>
               {openExceptions.slice(0, 3).map(load => (
                 <button key={load.id} className="notification-item" onClick={() => { setNotificationsOpen(false); router.push(`/loads/${load.id}`); }}>

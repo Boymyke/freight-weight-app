@@ -14,8 +14,10 @@ const filters: Array<'All' | LoadStatus> = ['All', 'Blocked', 'Review', 'Ready t
 export default function LoadsPage() {
   const { loads } = useDemo();
   const searchParams = useSearchParams();
+  const initialStatus = searchParams.get('status');
+  const safeStatus = filters.includes(initialStatus as (typeof filters)[number]) ? initialStatus as (typeof filters)[number] : 'All';
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
-  const [filter, setFilter] = useState<(typeof filters)[number]>('All');
+  const [filter, setFilter] = useState<(typeof filters)[number]>(safeStatus);
 
   const visible = useMemo(() => loads.filter(load => {
     const matchesFilter = filter === 'All' || load.status === filter;

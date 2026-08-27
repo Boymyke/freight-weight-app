@@ -1,4 +1,5 @@
 import './globals.css';
+import './reference.css';
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/AppShell';
 import { DemoProvider } from '@/lib/demo-store';

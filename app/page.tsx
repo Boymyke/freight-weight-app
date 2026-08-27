@@ -3,129 +3,155 @@
 import Link from 'next/link';
 import {
   ArrowRight,
+  ArrowUpRight,
+  CheckCircle2,
   CircleDollarSign,
   Clock3,
   FileCheck2,
   FileWarning,
+  MoreHorizontal,
+  Plus,
+  ReceiptText,
   RotateCcw,
-  Sparkles,
-  TrendingUp,
+  Search,
+  Truck,
 } from 'lucide-react';
-import { useMemo } from 'react';
-import { LoadsTable } from '@/components/LoadsTable';
-import { PageHeader } from '@/components/PageHeader';
-import { StatCard } from '@/components/StatCard';
+import { useMemo, useState } from 'react';
+import { StatusPill } from '@/components/StatusPill';
 import { formatMoney } from '@/lib/data';
 import { useDemo } from '@/lib/demo-store';
 
+const monthlyBars = [52, 46, 82, 49, 65, 38, 57];
+const yearlyBars = [38, 52, 45, 68, 74, 61, 79];
+const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'];
+
 export default function DashboardPage() {
-  const { loads, resetDemo, companyName } = useDemo();
+  const { loads, resetDemo } = useDemo();
+  const [period, setPeriod] = useState('This Month');
+  const [chartMode, setChartMode] = useState<'Monthly' | 'Yearly'>('Yearly');
+  const [hoveredBar, setHoveredBar] = useState<number | null>(2);
+  const [activityQuery, setActivityQuery] = useState('');
+  const [activityFilter, setActivityFilter] = useState<'All' | 'Open' | 'Clear'>('All');
 
   const metrics = useMemo(() => {
     const open = loads.filter(load => load.status === 'Blocked' || load.status === 'Review');
-    const ready = loads.filter(load => load.status === 'Ready to invoice' || load.status === 'Invoiced');
-    const deliveredValue = loads.reduce((sum, load) => sum + load.amount, 0);
+    const ready = loads.filter(load => load.status === 'Ready to invoice');
+    const invoiced = loads.filter(load => load.status === 'Invoiced');
     const readyValue = ready.reduce((sum, load) => sum + load.amount, 0);
     const blockedValue = open.reduce((sum, load) => sum + load.amount, 0);
+    const invoicedValue = invoiced.reduce((sum, load) => sum + load.amount, 0);
     const exposure = open.reduce((sum, load) => sum + load.risk, 0);
     const accessorialGap = loads.flatMap(load => load.accessorials).reduce((sum, item) => sum + Math.max(0, item.carrier - item.customer), 0);
-    const readiness = deliveredValue ? Math.round((readyValue / deliveredValue) * 100) : 0;
-    const stale = open.filter(load => load.ageHours >= 24).length;
-    return { open, ready, deliveredValue, readyValue, blockedValue, exposure, accessorialGap, readiness, stale };
+    return { open, ready, invoiced, readyValue, blockedValue, invoicedValue, exposure, accessorialGap };
   }, [loads]);
 
-  const steps = [
-    { label: 'Delivered', value: loads.length, icon: TrendingUp },
-    { label: 'Documents clear', value: loads.filter(load => load.pod && load.rateCon && load.carrierInvoice && load.customerRequirements).length, icon: FileCheck2 },
-    { label: 'Needs review', value: metrics.open.length, icon: FileWarning },
-    { label: 'Invoice ready', value: metrics.ready.length, icon: CircleDollarSign },
+  const wallet = [
+    { label: 'Invoice ready', value: metrics.readyValue, count: metrics.ready.length, status: 'Active', href: '/loads?status=Ready%20to%20invoice', icon: FileCheck2 },
+    { label: 'Blocked', value: metrics.blockedValue, count: metrics.open.filter(load => load.status === 'Blocked').length, status: 'Attention', href: '/loads?status=Blocked', icon: FileWarning },
+    { label: 'Under review', value: metrics.exposure, count: metrics.open.filter(load => load.status === 'Review').length, status: 'Reviewing', href: '/loads?status=Review', icon: Clock3 },
+    { label: 'Invoiced', value: metrics.invoicedValue, count: metrics.invoiced.length, status: 'Clear', href: '/loads?status=Invoiced', icon: ReceiptText },
   ];
 
-  const exceptions = useMemo(() => {
-    const groups: Record<string, number> = {};
-    metrics.open.forEach(load => {
-      const issue = load.issue ?? 'Manual review';
-      const key = issue.toLowerCase().includes('pod') || issue.toLowerCase().includes('receipt') ? 'Missing documents'
-        : issue.toLowerCase().includes('detention') || issue.toLowerCase().includes('layover') || issue.toLowerCase().includes('tonu') || issue.toLowerCase().includes('lumper') ? 'Accessorial review'
-        : issue.toLowerCase().includes('rate') || issue.toLowerCase().includes('invoice') ? 'Rate / invoice mismatch'
-        : 'Customer requirements';
-      groups[key] = (groups[key] ?? 0) + 1;
-    });
-    return Object.entries(groups).sort((a, b) => b[1] - a[1]);
-  }, [metrics.open]);
+  const chart = chartMode === 'Yearly' ? yearlyBars : monthlyBars;
+  const maxAmount = Math.max(metrics.blockedValue, metrics.readyValue, metrics.invoicedValue, 1000);
+  const activityRows = useMemo(() => loads.filter(load => {
+    const q = activityQuery.trim().toLowerCase();
+    const text = `${load.id} ${load.customer} ${load.issue ?? ''} ${load.lane}`.toLowerCase();
+    const matchesSearch = !q || text.includes(q);
+    const isOpen = load.status === 'Blocked' || load.status === 'Review';
+    const matchesFilter = activityFilter === 'All' || (activityFilter === 'Open' ? isOpen : !isOpen);
+    return matchesSearch && matchesFilter;
+  }).slice(0, 7), [loads, activityQuery, activityFilter]);
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Delivery-to-cash"
-        title={`Good afternoon, ${companyName.split(' ')[0]}`}
-        description="A live view of what happened after delivery and what still needs action before revenue can move."
-        actions={<>
-          <button className="button button--ghost" onClick={resetDemo}><RotateCcw size={15}/>Reset demo</button>
-          <Link className="button button--dark" href="/exceptions">Open exception queue <ArrowRight size={15}/></Link>
-        </>}
-      />
+    <div className="reference-dashboard">
+      <div className="overview-toolbar">
+        <div><h1>Overview</h1><p>Here is the summary of delivery-to-cash activity</p></div>
+        <div className="overview-actions">
+          <select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Dashboard period"><option>This Month</option><option>This Week</option><option>This Quarter</option></select>
+          <button onClick={resetDemo}><RotateCcw size={15}/>Reset Data</button>
+        </div>
+      </div>
 
-      <section className="metrics-grid">
-        <StatCard label="Invoice-ready value" value={formatMoney(metrics.readyValue)} note={`${metrics.readiness}% of delivered value`} icon={FileCheck2} trend={{ value: '8.4%' }} tone="dark"/>
-        <StatCard label="Blocked invoice value" value={formatMoney(metrics.blockedValue)} note={`${metrics.open.length} loads need intervention`} icon={Clock3} trend={{ value: '2.1%', positive: false }}/>
-        <StatCard label="Accessorial review" value={formatMoney(metrics.accessorialGap)} note="Carrier/customer billing gaps" icon={CircleDollarSign} trend={{ value: '12.6%' }}/>
+      <section className="reference-summary-grid">
+        <article className="reference-summary-card reference-summary-card--primary">
+          <div className="summary-card-top"><div className="summary-title"><span className="summary-icon"><CircleDollarSign size={17}/></span><span><strong>Invoice-ready value</strong><small>Ready for customer billing</small></span></div><button aria-label="More options"><MoreHorizontal size={18}/></button></div>
+          <div className="summary-value-row"><strong>{formatMoney(metrics.readyValue)}</strong><span><ArrowUpRight size={11}/>8.4%</span></div>
+          <Link href="/loads?status=Ready%20to%20invoice">See details <ArrowRight size={15}/></Link>
+        </article>
+
+        <article className="reference-summary-card">
+          <div className="summary-card-top"><div className="summary-title"><span className="summary-icon"><FileWarning size={17}/></span><span><strong>Blocked invoice value</strong><small>Waiting on an exception</small></span></div><button aria-label="More options"><MoreHorizontal size={18}/></button></div>
+          <div className="summary-value-row"><strong>{formatMoney(metrics.blockedValue)}</strong><span><ArrowUpRight size={11}/>3.2%</span></div>
+          <Link href="/exceptions">View exceptions <ArrowRight size={15}/></Link>
+        </article>
+
+        <article className="reference-summary-card">
+          <div className="summary-card-top"><div className="summary-title"><span className="summary-icon"><ReceiptText size={17}/></span><span><strong>Accessorial review</strong><small>Potential recoverable margin</small></span></div><button aria-label="More options"><MoreHorizontal size={18}/></button></div>
+          <div className="summary-value-row"><strong>{formatMoney(metrics.accessorialGap)}</strong><span><ArrowUpRight size={11}/>4.7%</span></div>
+          <Link href="/revenue">Analyze recovery <ArrowRight size={15}/></Link>
+        </article>
       </section>
 
-      <section className="dashboard-main-grid">
-        <article className="card workflow-card">
-          <div className="card-head">
-            <div><span className="eyebrow">Live workflow</span><h2>From delivered to invoice ready</h2><p>Click a stage to inspect the real demo records behind it.</p></div>
-            <span className="health-badge"><i/>{metrics.readiness}% healthy</span>
-          </div>
-          <div className="workflow-track">
-            {steps.map((step, index) => {
-              const Icon = step.icon;
-              const href = index === 2 ? '/exceptions' : '/loads';
-              return <Link href={href} className="workflow-step" key={step.label}>
-                <span className="workflow-icon"><Icon size={18}/></span>
-                <span><small>0{index + 1}</small><strong>{step.label}</strong><em>{step.value} loads</em></span>
-                {index < steps.length - 1 && <b/>}
+      <section className="reference-middle-grid">
+        <article className="reference-panel wallet-panel">
+          <div className="reference-panel-head"><div><h2>Revenue states</h2><p>Live post-delivery positions</p></div><Link href="/admin#new-load"><Plus size={14}/>Add New</Link></div>
+          <div className="wallet-grid">
+            {wallet.map(item => {
+              const Icon = item.icon;
+              return <Link className="wallet-tile" href={item.href} key={item.label}>
+                <div className="wallet-tile-top"><span className="wallet-symbol"><Icon size={17}/></span><MoreHorizontal size={15}/></div>
+                <strong>{formatMoney(item.value)}</strong>
+                <small>{item.count} loads</small>
+                <em className={item.status === 'Attention' ? 'is-attention' : ''}>{item.status}</em>
               </Link>;
             })}
           </div>
-          <div className="workflow-callout">
-            <span className="callout-icon"><Sparkles size={18}/></span>
-            <div><strong>{formatMoney(metrics.exposure)} needs a decision</strong><p>This is exception exposure, not confirmed loss. Open a load to verify documents, approve accessorials or release it to billing.</p></div>
-            <Link href="/exceptions">Review now <ArrowRight size={14}/></Link>
-          </div>
         </article>
 
-        <article className="card priority-card">
-          <div className="card-head card-head--compact"><div><span className="eyebrow">Priority</span><h2>What needs attention</h2></div><span className="count-badge">{metrics.open.length}</span></div>
-          <div className="priority-list">
-            <Link href="/exceptions" className="priority-item"><span className="priority-icon priority-icon--dark"><Clock3 size={16}/></span><div><strong>{metrics.stale} aging exceptions</strong><small>Older than 24 hours</small></div><ArrowRight size={15}/></Link>
-            <Link href="/revenue" className="priority-item"><span className="priority-icon"><CircleDollarSign size={16}/></span><div><strong>{formatMoney(metrics.accessorialGap)} accessorial gap</strong><small>Review evidence and customer-side billing</small></div><ArrowRight size={15}/></Link>
-            <Link href="/audit" className="priority-item"><span className="priority-icon"><Sparkles size={16}/></span><div><strong>Run a workflow audit</strong><small>Turn the demo into a discovery conversation</small></div><ArrowRight size={15}/></Link>
+        <article className="reference-panel cashflow-panel">
+          <div className="cashflow-heading">
+            <div><span>Revenue Flow</span><strong>{formatMoney(metrics.readyValue + metrics.invoicedValue)}</strong></div>
+            <div className="chart-toggle"><button className={chartMode === 'Monthly' ? 'is-active' : ''} onClick={() => setChartMode('Monthly')}>Monthly</button><button className={chartMode === 'Yearly' ? 'is-active' : ''} onClick={() => setChartMode('Yearly')}>Yearly</button></div>
+          </div>
+          <div className="reference-chart">
+            <div className="chart-axis"><span>50k</span><span>40k</span><span>30k</span><span>20k</span><span>10k</span><span>0k</span></div>
+            <div className="bar-zone">
+              <div className="chart-grid"><i/><i/><i/><i/><i/></div>
+              {chart.map((height, index) => {
+                const active = hoveredBar === index;
+                const illustrativeAmount = Math.round((height / 100) * maxAmount);
+                return <div className="chart-column" key={`${chartMode}-${labels[index]}`} onMouseEnter={() => setHoveredBar(index)} onMouseLeave={() => setHoveredBar(null)}>
+                  {active && <div className="chart-tooltip"><strong>{labels[index]}, 2026</strong><span>Invoice-ready <b>{formatMoney(illustrativeAmount)}</b></span><span>Exposure <b>-{formatMoney(Math.round(illustrativeAmount * .22))}</b></span></div>}
+                  <div className={`reference-bar ${active ? 'is-active' : ''}`} style={{ height: `${height}%` }}><i/></div>
+                  <span>{labels[index]}</span>
+                </div>;
+              })}
+            </div>
           </div>
         </article>
       </section>
 
-      <section className="dashboard-secondary-grid">
-        <article className="card exception-mix-card">
-          <div className="card-head card-head--compact"><div><span className="eyebrow">Exception mix</span><h2>Why billing is waiting</h2></div><Link className="text-link" href="/exceptions">View all <ArrowRight size={14}/></Link></div>
-          <div className="exception-bars">
-            {exceptions.map(([label, count], index) => {
-              const max = Math.max(1, ...exceptions.map(item => item[1]));
-              return <div className="exception-bar-row" key={label}>
-                <div><span>{label}</span><strong>{count}</strong></div>
-                <div className="exception-bar"><i data-index={index} style={{ width: `${Math.max(8, (count / max) * 100)}%` }}/></div>
-              </div>;
-            })}
-            {!exceptions.length && <div className="empty-inline">No open exceptions in the current scenario.</div>}
-          </div>
-        </article>
-
-        <article className="card table-card">
-          <div className="card-head card-head--compact"><div><span className="eyebrow">Recent exceptions</span><h2>Operational inbox</h2></div><Link className="text-link" href="/loads">All loads <ArrowRight size={14}/></Link></div>
-          <LoadsTable loads={metrics.open.slice(0, 5)} compact/>
-        </article>
+      <section className="reference-panel recent-activity-panel">
+        <div className="recent-activity-head"><h2>Recent Activities</h2><div><label><Search size={15}/><input value={activityQuery} onChange={event => setActivityQuery(event.target.value)} placeholder="Search"/></label><select value={activityFilter} onChange={event => setActivityFilter(event.target.value as 'All' | 'Open' | 'Clear')}><option>All</option><option>Open</option><option>Clear</option></select></div></div>
+        <div className="reference-table-wrap">
+          <table className="reference-table">
+            <thead><tr><th><input type="checkbox" aria-label="Select all"/></th><th>Activity</th><th>Load ID</th><th>Delivered</th><th>Customer</th><th>Price</th><th>Status</th><th/></tr></thead>
+            <tbody>
+              {activityRows.map(load => <tr key={load.id}>
+                <td><input type="checkbox" aria-label={`Select ${load.id}`}/></td>
+                <td><div className="activity-name"><span className={`activity-logo ${load.risk ? 'is-risk' : ''}`}>{load.risk ? <FileWarning size={14}/> : <CheckCircle2 size={14}/>}</span><div><strong>{load.issue ?? 'Billing packet cleared'}</strong><small>{load.lane}</small></div></div></td>
+                <td><Link href={`/loads/${load.id}`}>{load.id}</Link></td>
+                <td>{load.deliveredAt}</td>
+                <td>{load.customer}</td>
+                <td>{formatMoney(load.amount)}</td>
+                <td><StatusPill status={load.status}/></td>
+                <td><Link className="activity-more" href={`/loads/${load.id}`}><MoreHorizontal size={16}/></Link></td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
       </section>
-    </>
+    </div>
   );
 }

@@ -4,79 +4,84 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
-  Boxes,
   CircleDollarSign,
+  CircleHelp,
   ClipboardCheck,
+  Command,
   FileWarning,
   LayoutDashboard,
+  LogOut,
+  MessageSquareText,
+  ReceiptText,
+  RotateCcw,
+  Search,
   Settings2,
-  SlidersHorizontal,
   Truck,
 } from 'lucide-react';
 import { useDemo } from '@/lib/demo-store';
 
-const primary = [
+const mainMenu = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/loads', label: 'Loads', icon: Truck },
-  { href: '/exceptions', label: 'Exceptions', icon: FileWarning },
-  { href: '/revenue', label: 'Revenue', icon: CircleDollarSign },
+  { href: '/revenue', label: 'Invoices', icon: ReceiptText },
 ];
 
-const intelligence = [
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+const features = [
+  { href: '/exceptions', label: 'Exceptions', icon: FileWarning },
+  { href: '/revenue', label: 'Revenue recovery', icon: CircleDollarSign },
   { href: '/audit', label: 'Revenue audit', icon: ClipboardCheck },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const pathname = usePathname();
-  const { loads, companyName } = useDemo();
+  const { loads, resetDemo } = useDemo();
   const open = loads.filter(load => load.status === 'Blocked' || load.status === 'Review').length;
 
-  const item = ({ href, label, icon: Icon }: (typeof primary)[number]) => {
+  const renderItem = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }> }) => {
     const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
     return (
-      <Link href={href} className={`side-link ${active ? 'is-active' : ''}`} key={href}>
-        <Icon size={18} strokeWidth={1.8}/>
+      <Link href={href} className={`side-link ${active ? 'is-active' : ''}`} key={`${href}-${label}`}>
+        <Icon size={17} strokeWidth={1.8}/>
         <span>{label}</span>
         {href === '/exceptions' && open > 0 && <em>{open}</em>}
       </Link>
     );
   };
 
-  const initials = companyName.split(' ').filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'NL';
-
   return (
-    <aside className="sidebar">
-      <div className="brand-row">
-        <div className="brand-symbol">R</div>
-        <div className="brand-copy"><strong>Relay</strong><span>Revenue control</span></div>
+    <aside className="sidebar reference-sidebar">
+      <div className="brand-row reference-brand-row">
+        <div className="brand-symbol reference-brand-symbol">R</div>
+        <div className="brand-copy"><strong>Relay</strong><span>Freight revenue control</span></div>
       </div>
 
-      <Link href="/admin" className="workspace-card">
-        <span className="workspace-avatar">{initials}</span>
-        <span><strong>{companyName}</strong><small>Demo workspace</small></span>
-        <Boxes size={16}/>
-      </Link>
+      <button className="sidebar-search" onClick={onSearch}>
+        <Search size={16}/><span>Search</span><kbd><Command size={11}/>K</kbd>
+      </button>
 
       <nav className="side-group">
-        <span className="side-group-label">Workspace</span>
-        {primary.map(item)}
+        <span className="side-group-label">Main menu</span>
+        {mainMenu.map(renderItem)}
       </nav>
 
       <nav className="side-group">
-        <span className="side-group-label">Intelligence</span>
-        {intelligence.map(item)}
+        <span className="side-group-label">Features</span>
+        {features.map(renderItem)}
+        <Link href="/admin" className={`side-link ${pathname.startsWith('/admin') ? 'is-active' : ''}`}><MessageSquareText size={17}/><span>Demo controls</span></Link>
       </nav>
 
-      <nav className="side-group side-group--bottom">
-        <span className="side-group-label">Demo</span>
-        <Link href="/admin" className={`side-link ${pathname.startsWith('/admin') ? 'is-active' : ''}`}><SlidersHorizontal size={18}/><span>Demo controls</span></Link>
-        <Link href="/admin#settings" className="side-link"><Settings2 size={18}/><span>Settings</span></Link>
+      <nav className="side-group side-group--bottom reference-general-links">
+        <span className="side-group-label">General</span>
+        <Link href="/admin#settings" className="side-link"><Settings2 size={17}/><span>Settings</span></Link>
+        <button className="side-link side-button" onClick={onSearch}><CircleHelp size={17}/><span>Help desk</span></button>
+        <button className="side-link side-button" onClick={resetDemo}><LogOut size={17}/><span>Reset demo</span></button>
       </nav>
 
-      <div className="sidebar-footnote">
-        <i/>
-        <span><strong>Interactive mode</strong><small>Changes stay in this browser</small></span>
+      <div className="sidebar-promo">
+        <strong>Interactive demo ✨</strong>
+        <p>Switch scenarios and tailor the workspace for each prospect.</p>
+        <div><Link href="/admin">Configure</Link><button onClick={resetDemo}><RotateCcw size={13}/>Reset</button></div>
       </div>
     </aside>
   );
