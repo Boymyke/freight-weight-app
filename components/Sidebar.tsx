@@ -24,7 +24,7 @@ const mainMenu = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/loads', label: 'Loads', icon: Truck },
-  { href: '/revenue', label: 'Invoices', icon: ReceiptText },
+  { href: '/invoices', label: 'Invoices', icon: ReceiptText },
 ];
 
 const features = [
