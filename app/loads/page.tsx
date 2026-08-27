@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Plus, Search } from 'lucide-react';
+import { Filter, Plus, Search, SlidersHorizontal } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { LoadsTable } from '@/components/LoadsTable';
 import { PageHeader } from '@/components/PageHeader';
-import { LoadStatus } from '@/lib/data';
+import type { LoadStatus } from '@/lib/data';
 import { useDemo } from '@/lib/demo-store';
 
 const filters: Array<'All' | LoadStatus> = ['All', 'Blocked', 'Review', 'Ready to invoice', 'Invoiced'];
@@ -25,19 +25,25 @@ export default function LoadsPage() {
 
   return <>
     <PageHeader
-      eyebrow="LOAD CONTROL"
+      eyebrow="Load control"
       title="Delivered loads"
-      description="Search, filter and open any load to change documents, ownership, accessorials or invoice readiness."
-      actions={<Link className="primaryButton" href="/admin#new-load"><Plus size={15}/> Add demo load</Link>}
+      description="Inspect every post-delivery record, billing packet and exception from one place."
+      actions={<Link className="button button--dark" href="/admin#new-load"><Plus size={15}/>Add demo load</Link>}
     />
 
-    <section className="panel tablePanel pagePanel">
-      <div className="listToolbar">
-        <div className="filterTabs">{filters.map(item => <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>{item}</button>)}</div>
-        <label className="tableSearch"><Search size={15}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search load, customer, owner…"/></label>
+    <section className="card loads-card">
+      <div className="loads-toolbar">
+        <div className="filter-pills">
+          {filters.map(item => <button key={item} className={filter === item ? 'is-active' : ''} onClick={() => setFilter(item)}>{item}</button>)}
+        </div>
+        <div className="loads-toolbar-right">
+          <label className="search-field"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search load, customer, lane or owner"/></label>
+          <button className="icon-button icon-button--border" title="Filter options"><Filter size={16}/></button>
+          <button className="icon-button icon-button--border" title="View settings"><SlidersHorizontal size={16}/></button>
+        </div>
       </div>
-      <div className="panelHeader tableHeader"><div><p className="eyebrow">RECENT DELIVERIES</p><h2>{visible.length} loads in this view</h2></div><span className="countPill">Interactive table</span></div>
-      <LoadsTable loads={visible} interactive/>
+      <div className="list-summary"><div><span className="eyebrow">Current view</span><strong>{visible.length} loads</strong></div><span>{filter === 'All' ? 'All delivery states' : filter}</span></div>
+      <LoadsTable loads={visible}/>
     </section>
   </>;
 }

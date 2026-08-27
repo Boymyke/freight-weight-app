@@ -1,15 +1,15 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, ChevronDown, CircleHelp, Copy, Mail, Share2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Bell, ChevronDown, Command, Search, Share2, Sparkles, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { useDemo } from '@/lib/demo-store';
 
 const labels: Record<string, string> = {
   loads: 'Loads',
   exceptions: 'Exceptions',
-  revenue: 'Revenue',
+  revenue: 'Revenue recovery',
   analytics: 'Analytics',
   audit: 'Revenue audit',
   admin: 'Demo controls',
@@ -18,11 +18,35 @@ const labels: Record<string, string> = {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { companyName } = useDemo();
-  const [toast, setToast] = useState('');
+  const { loads, companyName } = useDemo();
+  const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [toast, setToast] = useState('');
+
   const segment = pathname.split('/').filter(Boolean)[0];
-  const current = segment ? labels[segment] ?? 'Workspace' : 'Dashboard';
+  const page = segment ? labels[segment] ?? 'Workspace' : 'Dashboard';
+  const openExceptions = useMemo(() => loads.filter(load => load.status === 'Blocked' || load.status === 'Review'), [loads]);
+  const searchResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return loads.slice(0, 5);
+    return loads.filter(load => `${load.id} ${load.customer} ${load.lane} ${load.issue ?? ''}`.toLowerCase().includes(q)).slice(0, 7);
+  }, [loads, query]);
+
+  useEffect(() => {
+    const handle = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen(value => !value);
+      }
+      if (event.key === 'Escape') {
+        setSearchOpen(false);
+        setNotificationsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -33,41 +57,71 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const share = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      setToast('Demo link copied');
+      setToast('Demo URL copied');
     } catch {
-      setToast('Copy the URL from your browser');
+      setToast('Copy the current URL from the browser');
     }
   };
 
-  return <div className="appFrame">
-    <Sidebar/>
-    <div className="appContent">
-      <header className="globalTopbar">
-        <div className="crumbs">
-          <div className="historyButtons">
-            <button onClick={() => router.back()} aria-label="Go back">‹</button>
-            <button onClick={() => router.forward()} aria-label="Go forward">›</button>
+  const goToLoad = (id: string) => {
+    setSearchOpen(false);
+    setQuery('');
+    router.push(`/loads/${id}`);
+  };
+
+  return (
+    <div className="app-shell">
+      <Sidebar/>
+      <section className="workspace-shell">
+        <header className="topbar">
+          <div className="breadcrumb"><span>{companyName}</span><i>/</i><strong>{page}</strong></div>
+          <button className="global-search" onClick={() => setSearchOpen(true)}>
+            <Search size={16}/><span>Search loads, customers, exceptions</span><kbd><Command size={12}/> K</kbd>
+          </button>
+          <div className="topbar-actions">
+            <button className="icon-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="Notifications">
+              <Bell size={18}/>{openExceptions.length > 0 && <i className="notification-dot"/>}
+            </button>
+            <button className="profile-chip" onClick={() => router.push('/admin')}><span>FD</span><ChevronDown size={14}/></button>
+            <button className="button button--dark button--sm" onClick={share}><Share2 size={15}/>Share demo</button>
           </div>
-          <span>{companyName}</span><b>›</b><strong>{current}</strong>
-        </div>
-        <div className="globalActions">
-          <button className="topIcon" title="Help" onClick={() => setToast('Demo tip: use /admin to change the scenario')}><CircleHelp size={17}/></button>
-          <button className="topIcon" title="Messages" onClick={() => setToast('No unread demo messages')}><Mail size={17}/></button>
-          <div className="notificationWrap">
-            <button className="topIcon" title="Notifications" onClick={() => setNotificationsOpen(value => !value)}><Bell size={17}/><i/></button>
-            {notificationsOpen && <div className="notificationMenu">
-              <strong>Revenue alerts</strong>
-              <p>3 accessorials need review.</p>
-              <p>2 blocked loads are older than 24 hours.</p>
-              <button onClick={() => { setNotificationsOpen(false); router.push('/exceptions'); }}>Open exception queue</button>
-            </div>}
+
+          {notificationsOpen && (
+            <div className="notification-popover">
+              <div className="popover-head"><strong>Needs attention</strong><button onClick={() => setNotificationsOpen(false)}><X size={16}/></button></div>
+              {openExceptions.slice(0, 3).map(load => (
+                <button key={load.id} className="notification-item" onClick={() => { setNotificationsOpen(false); router.push(`/loads/${load.id}`); }}>
+                  <span><strong>{load.id}</strong><small>{load.issue ?? 'Billing exception'}</small></span><em>{load.ageHours}h</em>
+                </button>
+              ))}
+              <button className="popover-action" onClick={() => { setNotificationsOpen(false); router.push('/exceptions'); }}>View exception queue</button>
+            </div>
+          )}
+        </header>
+
+        <main className="workspace-main">{children}</main>
+      </section>
+
+      {searchOpen && (
+        <div className="command-backdrop" onMouseDown={() => setSearchOpen(false)}>
+          <div className="command-panel" onMouseDown={event => event.stopPropagation()}>
+            <div className="command-input"><Search size={18}/><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search load number, customer, lane or issue…"/><button onClick={() => setSearchOpen(false)}>Esc</button></div>
+            <div className="command-section">
+              <span className="command-label">Loads</span>
+              {searchResults.map(load => (
+                <button className="command-result" key={load.id} onClick={() => goToLoad(load.id)}>
+                  <span className="command-result-icon"><Sparkles size={15}/></span>
+                  <span><strong>{load.id} · {load.customer}</strong><small>{load.lane} · {load.issue ?? 'Billing packet clear'}</small></span>
+                  <em>{load.status}</em>
+                </button>
+              ))}
+              {!searchResults.length && <div className="command-empty">No loads match “{query}”.</div>}
+            </div>
           </div>
-          <button className="profileButton" onClick={() => router.push('/admin')}><span>FD</span><ChevronDown size={14}/></button>
-          <button className="shareButton" onClick={share}><Share2 size={16}/> Share</button>
         </div>
-      </header>
-      <main className="mainContent">{children}</main>
+      )}
+
+      {toast && <div className="toast">{toast}</div>}
     </div>
-    {toast && <div className="toast"><Copy size={15}/>{toast}</div>}
-  </div>;
+  );
 }

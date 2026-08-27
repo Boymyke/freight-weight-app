@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { FreightLoad, loads as seedLoads, LoadStatus } from '@/lib/data';
+import type { FreightLoad, LoadStatus } from '@/lib/data';
+import { loads as seedLoads } from '@/lib/data';
 
 type DocumentKey = 'pod' | 'rateCon' | 'carrierInvoice' | 'customerRequirements';
 type AccessorialPatch = Partial<{ carrier: number; customer: number; evidence: boolean; approved: boolean }>;
@@ -22,10 +23,11 @@ type DemoContextValue = {
   removeLoad: (id: string) => void;
 };
 
-const STORAGE_KEY = 'relay-demo-state-v2';
+const STORAGE_KEY = 'relay-demo-state-v3';
 const DemoContext = createContext<DemoContextValue | null>(null);
-
 const cloneSeed = () => JSON.parse(JSON.stringify(seedLoads)) as FreightLoad[];
+const isDocumentIssue = (issue?: string) => /pod|receipt|packet|document|customer/i.test(issue ?? '');
+const isAccessorialIssue = (issue?: string) => /detention|layover|tonu|lumper|accessorial/i.test(issue ?? '');
 
 export function DemoProvider({ children }: { children: React.ReactNode }) {
   const [companyName, setCompanyNameState] = useState('Nexus Logistics');
@@ -41,7 +43,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         if (Array.isArray(parsed.loads) && parsed.loads.length) setLoads(parsed.loads);
       }
     } catch {
-      // The demo works with seed data even when storage is unavailable.
+      // Seed data keeps the demo working when storage is unavailable.
     } finally {
       setHydrated(true);
     }
@@ -52,19 +54,19 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ companyName, loads }));
     } catch {
-      // Ignore storage failures in private browsing environments.
+      // Ignore localStorage failures in restricted browsing modes.
     }
   }, [companyName, loads, hydrated]);
 
   const value = useMemo<DemoContextValue>(() => ({
     companyName,
     loads,
-    setCompanyName: (name) => setCompanyNameState(name.trim() || 'Nexus Logistics'),
+    setCompanyName: name => setCompanyNameState(name.trim() || 'Nexus Logistics'),
     resetDemo: () => {
       setCompanyNameState('Nexus Logistics');
       setLoads(cloneSeed());
     },
-    seedScenario: (scenario) => {
+    seedScenario: scenario => {
       const base = cloneSeed();
       if (scenario === 'clean') {
         setLoads(base.map((load, index) => ({
@@ -77,7 +79,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           rateCon: true,
           carrierInvoice: true,
           customerRequirements: true,
-          accessorials: load.accessorials.map(a => ({ ...a, customer: a.carrier, evidence: true, approved: true })),
+          accessorials: load.accessorials.map(item => ({ ...item, customer: item.carrier, evidence: true, approved: true })),
         })));
         return;
       }
@@ -95,27 +97,44 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     },
     updateLoad: (id, patch) => setLoads(current => current.map(load => load.id === id ? { ...load, ...patch } : load)),
     setLoadStatus: (id, status) => setLoads(current => current.map(load => load.id === id ? { ...load, status } : load)),
-    resolveLoad: (id) => setLoads(current => current.map(load => load.id === id ? {
+    resolveLoad: id => setLoads(current => current.map(load => load.id === id ? {
       ...load,
       status: 'Ready to invoice',
       issue: undefined,
       risk: 0,
       owner: 'Automated',
+      pod: true,
+      rateCon: true,
+      carrierInvoice: true,
+      customerRequirements: true,
+      accessorials: load.accessorials.map(item => ({ ...item, customer: item.carrier, evidence: true, approved: true })),
     } : load)),
     assignLoad: (id, owner) => setLoads(current => current.map(load => load.id === id ? { ...load, owner } : load)),
-    toggleDocument: (id, key) => setLoads(current => current.map(load => load.id === id ? { ...load, [key]: !load[key] } : load)),
+    toggleDocument: (id, key) => setLoads(current => current.map(load => {
+      if (load.id !== id) return load;
+      const updated = { ...load, [key]: !load[key] };
+      const docsClear = updated.pod && updated.rateCon && updated.carrierInvoice && updated.customerRequirements;
+      const gap = updated.accessorials.reduce((sum, item) => sum + Math.max(0, item.carrier - item.customer), 0);
+      if (docsClear && gap === 0 && isDocumentIssue(updated.issue)) {
+        return { ...updated, status: 'Ready to invoice', issue: undefined, risk: 0, owner: 'Automated' };
+      }
+      if (!docsClear && (updated.status === 'Ready to invoice' || updated.status === 'Invoiced')) {
+        return { ...updated, status: 'Blocked', issue: 'Billing document missing', risk: updated.amount, owner: 'Billing team' };
+      }
+      return updated;
+    })),
     updateAccessorial: (loadId, label, patch) => setLoads(current => current.map(load => {
       if (load.id !== loadId) return load;
       const accessorials = load.accessorials.map(item => item.label === label ? { ...item, ...patch } : item);
       const gap = accessorials.reduce((sum, item) => sum + Math.max(0, item.carrier - item.customer), 0);
-      return {
-        ...load,
-        accessorials,
-        risk: load.issue?.toLowerCase().includes('pod') || load.issue?.toLowerCase().includes('packet') ? load.risk : gap,
-      };
+      const docsClear = load.pod && load.rateCon && load.carrierInvoice && load.customerRequirements;
+      if (gap === 0 && docsClear && isAccessorialIssue(load.issue)) {
+        return { ...load, accessorials, status: 'Ready to invoice', issue: undefined, risk: 0, owner: 'Automated' };
+      }
+      return { ...load, accessorials, risk: isAccessorialIssue(load.issue) ? gap : load.risk };
     })),
-    addLoad: (load) => setLoads(current => [load, ...current.filter(item => item.id !== load.id)]),
-    removeLoad: (id) => setLoads(current => current.filter(load => load.id !== id)),
+    addLoad: load => setLoads(current => [load, ...current.filter(item => item.id !== load.id)]),
+    removeLoad: id => setLoads(current => current.filter(load => load.id !== id)),
   }), [companyName, loads]);
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;

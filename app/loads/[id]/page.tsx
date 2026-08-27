@@ -2,94 +2,136 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Check, CheckCircle2, FileText, UserRound, XCircle } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock3,
+  FileCheck2,
+  FileText,
+  Paperclip,
+  UserRound,
+  X,
+} from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import { formatMoney, statusClass } from '@/lib/data';
+import { StatusPill } from '@/components/StatusPill';
+import { formatMoney } from '@/lib/data';
 import { useDemo } from '@/lib/demo-store';
 
-const docs = [
-  ['pod', 'Signed proof of delivery'],
-  ['rateCon', 'Rate confirmation'],
-  ['carrierInvoice', 'Carrier invoice'],
-  ['customerRequirements', 'Customer billing requirements'],
+const documents = [
+  ['pod', 'Signed proof of delivery', 'POD'],
+  ['rateCon', 'Rate confirmation', 'Rate con'],
+  ['carrierInvoice', 'Carrier invoice', 'Carrier invoice'],
+  ['customerRequirements', 'Customer billing requirements', 'Customer rules'],
 ] as const;
 
-export default function LoadPage() {
+export default function LoadDetailPage() {
   const params = useParams<{ id: string }>();
   const { loads, resolveLoad, assignLoad, toggleDocument, updateAccessorial, updateLoad } = useDemo();
   const load = loads.find(item => item.id === params.id);
 
-  if (!load) return <section className="panel notFoundPanel"><h1>Load not found</h1><p>This demo load may have been removed from the admin screen.</p><Link className="primaryButton" href="/loads">Back to loads</Link></section>;
+  if (!load) {
+    return <div className="card not-found-card"><span>404</span><h1>Load not found</h1><p>The demo load may have been removed from Demo controls.</p><Link href="/loads" className="button button--dark">Back to loads</Link></div>;
+  }
 
-  const allDocsReady = docs.every(([key]) => load[key]);
+  const verified = documents.filter(([key]) => load[key]).length;
+  const allDocumentsReady = verified === documents.length;
+  const accessorialGap = load.accessorials.reduce((sum, item) => sum + Math.max(0, item.carrier - item.customer), 0);
+  const workflow = [
+    { label: 'Delivered', done: true },
+    { label: 'Documents', done: allDocumentsReady },
+    { label: 'Reconciled', done: load.risk === 0 || (allDocumentsReady && accessorialGap === 0) },
+    { label: 'Invoice ready', done: load.status === 'Ready to invoice' || load.status === 'Invoiced' },
+  ];
 
   return <>
-    <Link href="/loads" className="backLink"><ArrowLeft size={15}/> Back to loads</Link>
+    <Link href="/loads" className="back-link"><ArrowLeft size={15}/>Back to loads</Link>
     <PageHeader
-      eyebrow="LOAD DETAIL"
+      eyebrow="Load detail"
       title={load.id}
       description={`${load.customer} · ${load.lane}`}
-      actions={<span className={`status large ${statusClass(load.status)}`}>{load.status}</span>}
+      actions={<StatusPill status={load.status}/>}
     />
 
-    <section className="loadSummaryGrid">
-      <div className="panel documentPanel">
-        <div className="panelHeader"><div><p className="eyebrow">DOCUMENT READINESS</p><h2>Billing packet</h2></div><span className={`countPill ${allDocsReady ? 'good' : ''}`}>{docs.filter(([key]) => load[key]).length}/{docs.length} verified</span></div>
-        <div className="documentList">{docs.map(([key, label]) => {
-          const ready = load[key];
-          return <button key={key} className={`documentRow ${ready ? 'ready' : ''}`} onClick={() => toggleDocument(load.id, key)}>
-            <span className="documentIcon">{ready ? <CheckCircle2 size={18}/> : <XCircle size={18}/>}</span>
-            <span><strong>{label}</strong><small>{ready ? 'Verified and attached' : 'Missing or needs review'}</small></span>
-            <em>{ready ? 'Verified' : 'Fix now'}</em>
-          </button>;
-        })}</div>
-      </div>
-
-      <div className={`panel exceptionCard ${load.risk === 0 ? 'clear' : ''}`}>
-        <div className="exceptionIcon">{load.risk === 0 ? <CheckCircle2 size={20}/> : <FileText size={20}/>}</div>
-        <p className="eyebrow">EXCEPTION EXPOSURE</p>
-        <strong className="bigMoney">{formatMoney(load.risk)}</strong>
-        <h3>{load.issue ?? 'No active billing exception'}</h3>
-        <p>{load.risk === 0 ? 'This load is clear to move to invoicing.' : 'Resolve or approve the exception before releasing the customer invoice.'}</p>
-        <div className="stackedActions">
-          {load.risk > 0 && <button className="primaryButton" onClick={() => resolveLoad(load.id)}><Check size={15}/> Mark invoice ready</button>}
-          <button className="secondaryButton compact" onClick={() => assignLoad(load.id, 'Michael')}><UserRound size={15}/> Assign to me</button>
-        </div>
+    <section className="card load-flow-card">
+      <div className="load-flow-head"><div><span>Delivered</span><strong>{load.deliveredAt}</strong></div><div><span>Customer amount</span><strong>{formatMoney(load.amount)}</strong></div><div><span>Owner</span><strong>{load.owner}</strong></div></div>
+      <div className="load-flow-steps">
+        {workflow.map((step, index) => <div className={`load-flow-step ${step.done ? 'is-done' : ''}`} key={step.label}><span>{step.done ? <Check size={14}/> : index + 1}</span><strong>{step.label}</strong>{index < workflow.length - 1 && <i/>}</div>)}
       </div>
     </section>
 
-    <section className="panel financialPanel">
-      <div className="panelHeader"><div><p className="eyebrow">RECONCILIATION</p><h2>Financial checks</h2></div></div>
-      <div className="reconGrid">
-        <div><span>Customer amount</span><strong>{formatMoney(load.amount)}</strong></div>
-        <div><span>Exception exposure</span><strong>{formatMoney(load.risk)}</strong></div>
-        <div><span>Exception owner</span><strong>{load.owner}</strong></div>
-        <div><span>Delivered</span><strong>{load.deliveredAt}</strong></div>
+    <section className="load-detail-grid">
+      <div className="load-detail-main">
+        <article className="card document-card">
+          <div className="card-head card-head--compact"><div><span className="eyebrow">Billing packet</span><h2>Document readiness</h2></div><span className={`completion-chip ${allDocumentsReady ? 'is-complete' : ''}`}>{verified}/{documents.length} verified</span></div>
+          <div className="document-list">
+            {documents.map(([key, label, short]) => {
+              const done = load[key];
+              return <button className={`document-item ${done ? 'is-done' : ''}`} key={key} onClick={() => toggleDocument(load.id, key)}>
+                <span className="document-icon">{done ? <CheckCircle2 size={19}/> : <FileText size={19}/>}</span>
+                <span><strong>{label}</strong><small>{done ? 'Verified and attached' : 'Missing or needs review'}</small></span>
+                <em>{done ? 'Verified' : `Fix ${short}`}</em>
+              </button>;
+            })}
+          </div>
+        </article>
+
+        <article className="card reconciliation-card">
+          <div className="card-head card-head--compact"><div><span className="eyebrow">Reconciliation</span><h2>Financial checks</h2></div><CircleDollarSign size={18}/></div>
+          <div className="reconciliation-summary">
+            <div><span>Customer amount</span><strong>{formatMoney(load.amount)}</strong></div>
+            <div><span>Exception exposure</span><strong className={load.risk ? 'text-risk' : ''}>{formatMoney(load.risk)}</strong></div>
+            <div><span>Accessorial gap</span><strong className={accessorialGap ? 'text-risk' : ''}>{formatMoney(accessorialGap)}</strong></div>
+          </div>
+
+          {load.accessorials.length > 0 ? <div className="accessorial-list">
+            {load.accessorials.map(item => {
+              const gap = Math.max(0, item.carrier - item.customer);
+              return <div className="accessorial-item" key={item.label}>
+                <span className="accessorial-mark"><Paperclip size={16}/></span>
+                <div className="accessorial-copy"><strong>{item.label}</strong><small>{item.evidence ? 'Evidence attached' : 'Evidence missing'}</small></div>
+                <div className="accessorial-number"><span>Carrier</span><strong>{formatMoney(item.carrier)}</strong></div>
+                <div className="accessorial-number"><span>Customer</span><strong>{formatMoney(item.customer)}</strong></div>
+                <div className="accessorial-number"><span>Gap</span><strong className={gap ? 'text-risk' : ''}>{formatMoney(gap)}</strong></div>
+                <div className="accessorial-actions">
+                  {!item.evidence && <button className="button button--ghost button--sm" onClick={() => updateAccessorial(load.id, item.label, { evidence: true })}><Paperclip size={14}/>Attach</button>}
+                  {gap > 0 ? <button className="button button--dark button--sm" onClick={() => updateAccessorial(load.id, item.label, { customer: item.carrier, approved: true })}><Check size={14}/>Approve rebill</button> : <span className="matched-chip"><Check size={13}/>Matched</span>}
+                </div>
+              </div>;
+            })}
+          </div> : <div className="clear-state"><FileCheck2 size={20}/><div><strong>No accessorial exceptions</strong><p>This load has no carrier/customer charge differences in the demo.</p></div></div>}
+        </article>
+
+        <article className="card notes-card">
+          <div className="card-head card-head--compact"><div><span className="eyebrow">Internal note</span><h2>Decision context</h2></div></div>
+          <textarea value={load.note ?? `Review ${load.issue ?? 'billing packet'} before invoice release.`} onChange={event => updateLoad(load.id, { note: event.target.value })}/>
+          <span>Saved automatically in this browser session.</span>
+        </article>
       </div>
 
-      {load.accessorials.length > 0 && <div className="accessorialBlock">
-        <div className="accessorialTitle"><FileText size={17}/><div><strong>Accessorial review</strong><span>Compare carrier-side charges against the customer billing side.</span></div></div>
-        {load.accessorials.map(item => {
-          const gap = Math.max(0, item.carrier - item.customer);
-          return <div className="accessorialRow" key={item.label}>
-            <div><span>Type</span><strong>{item.label}</strong></div>
-            <div><span>Carrier billed</span><strong>{formatMoney(item.carrier)}</strong></div>
-            <div><span>Customer billed</span><strong>{formatMoney(item.customer)}</strong></div>
-            <div><span>Gap</span><strong className={gap > 0 ? 'risk' : ''}>{formatMoney(gap)}</strong></div>
-            <div className="accessorialActions">
-              {!item.evidence && <button onClick={() => updateAccessorial(load.id, item.label, { evidence: true })}>Attach evidence</button>}
-              {gap > 0 && <button className="approveButton" onClick={() => updateAccessorial(load.id, item.label, { customer: item.carrier, approved: true })}>Approve rebill</button>}
-              {gap === 0 && <span className="status ready-to-invoice">Matched</span>}
-            </div>
-          </div>;
-        })}
-      </div>}
+      <aside className="load-detail-aside">
+        <article className={`card resolution-card ${load.risk === 0 ? 'is-clear' : ''}`}>
+          <span className="resolution-icon">{load.risk === 0 ? <CheckCircle2 size={20}/> : <Clock3 size={20}/>}</span>
+          <span className="eyebrow">Current exception</span>
+          <strong className="resolution-money">{formatMoney(load.risk)}</strong>
+          <h2>{load.issue ?? 'Ready to move'}</h2>
+          <p>{load.risk === 0 ? 'This load can move into the invoice-ready queue.' : 'Review the missing context, then release or reassign the exception.'}</p>
+          <div className="resolution-actions">
+            {load.risk > 0 && <button className="button button--dark" onClick={() => resolveLoad(load.id)}><Check size={15}/>Mark invoice ready</button>}
+            <button className="button button--ghost" onClick={() => assignLoad(load.id, 'Michael')}><UserRound size={15}/>Assign to me</button>
+          </div>
+        </article>
 
-      <div className="loadNotes">
-        <label>Internal note</label>
-        <textarea value={load.note ?? `Review ${load.issue ?? 'billing packet'} before invoice release.`} onChange={event => updateLoad(load.id, { note: event.target.value })}/>
-        <small>Demo note updates the current browser session.</small>
-      </div>
+        <article className="card activity-card">
+          <div className="card-head card-head--compact"><div><span className="eyebrow">Activity</span><h2>Load timeline</h2></div></div>
+          <div className="activity-list">
+            <div><span><Check size={12}/></span><div><strong>Delivery confirmed</strong><small>{load.deliveredAt}</small></div></div>
+            <div><span>{load.pod ? <Check size={12}/> : <X size={12}/>}</span><div><strong>POD check</strong><small>{load.pod ? 'Verified' : 'Action required'}</small></div></div>
+            <div><span>{load.risk === 0 ? <Check size={12}/> : <Clock3 size={12}/>}</span><div><strong>Billing exception</strong><small>{load.issue ?? 'No active exception'}</small></div></div>
+          </div>
+        </article>
+      </aside>
     </section>
   </>;
 }

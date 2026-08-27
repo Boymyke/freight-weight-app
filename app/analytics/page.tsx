@@ -1,55 +1,67 @@
 'use client';
 
+import { Activity, Clock3, FileWarning, Gauge, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
 import { formatMoney } from '@/lib/data';
 import { useDemo } from '@/lib/demo-store';
 
-const buckets = [
-  { label: '0–12h', min: 0, max: 12 },
-  { label: '12–24h', min: 12, max: 24 },
-  { label: '24–48h', min: 24, max: 48 },
-  { label: '48h+', min: 48, max: Infinity },
-];
+const weekly = [58, 62, 68, 66, 72, 77, 81, 79, 84, 87, 85, 89];
+const monthly = [49, 53, 57, 61, 64, 67, 70, 74, 77, 79, 83, 87];
 
 export default function AnalyticsPage() {
   const { loads } = useDemo();
-  const [metric, setMetric] = useState<'Loads' | 'Value'>('Loads');
+  const [range, setRange] = useState<'Week' | 'Month'>('Week');
   const open = useMemo(() => loads.filter(load => load.status === 'Blocked' || load.status === 'Review'), [loads]);
-  const ready = loads.filter(load => load.status === 'Ready to invoice' || load.status === 'Invoiced').length;
-  const readinessRate = loads.length ? Math.round((ready / loads.length) * 100) : 0;
+  const ready = loads.filter(load => load.status === 'Ready to invoice' || load.status === 'Invoiced');
+  const readiness = loads.length ? Math.round((ready.length / loads.length) * 100) : 0;
   const avgAge = open.length ? Math.round(open.reduce((sum, load) => sum + load.ageHours, 0) / open.length) : 0;
   const exposure = open.reduce((sum, load) => sum + load.risk, 0);
-  const data = buckets.map(bucket => {
-    const rows = open.filter(load => load.ageHours >= bucket.min && load.ageHours < bucket.max);
-    return { ...bucket, count: rows.length, value: rows.reduce((sum, load) => sum + load.amount, 0) };
-  });
-  const max = Math.max(1, ...data.map(item => metric === 'Loads' ? item.count : item.value));
+  const series = range === 'Week' ? weekly : monthly;
+  const points = series.map((value, index) => `${(index / (series.length - 1)) * 100},${100 - value}`).join(' ');
+
+  const aging = [
+    { label: '0–12h', count: open.filter(load => load.ageHours < 12).length },
+    { label: '12–24h', count: open.filter(load => load.ageHours >= 12 && load.ageHours < 24).length },
+    { label: '24–48h', count: open.filter(load => load.ageHours >= 24 && load.ageHours < 48).length },
+    { label: '48h+', count: open.filter(load => load.ageHours >= 48).length },
+  ];
+  const maxAging = Math.max(1, ...aging.map(item => item.count));
 
   return <>
-    <PageHeader eyebrow="ANALYTICS" title="Delivery-to-cash performance" description="Measure how quickly delivered loads become invoice-ready and where exceptions are aging."/>
+    <PageHeader eyebrow="Analytics" title="Delivery-to-cash performance" description="See whether post-delivery work is getting faster, cleaner and easier to control."/>
 
-    <section className="kpiGrid">
-      <StatCard label="Billing readiness" value={`${readinessRate}%`} note={`${ready} of ${loads.length} demo loads are clear`} accent />
-      <StatCard label="Average exception age" value={`${avgAge}h`} note={`${open.filter(load => load.ageHours >= 24).length} exceptions are 24h+`} />
-      <StatCard label="Exception exposure" value={formatMoney(exposure)} note="Potential impact requiring review" />
+    <section className="metrics-grid">
+      <StatCard label="Billing readiness" value={`${readiness}%`} note={`${ready.length} of ${loads.length} loads are clear`} icon={Gauge} tone="dark"/>
+      <StatCard label="Average exception age" value={`${avgAge}h`} note={`${open.filter(load => load.ageHours >= 24).length} exceptions are 24h+`} icon={Clock3}/>
+      <StatCard label="Exception exposure" value={formatMoney(exposure)} note="Potential impact requiring review" icon={FileWarning}/>
     </section>
 
-    <section className="analyticsGrid pagePanel">
-      <div className="panel agingPanel">
-        <div className="panelHeader"><div><p className="eyebrow">EXCEPTION AGING</p><h2>How long delivered revenue stays blocked</h2></div><div className="segmented"><button className={metric === 'Loads' ? 'active' : ''} onClick={() => setMetric('Loads')}>Loads</button><button className={metric === 'Value' ? 'active' : ''} onClick={() => setMetric('Value')}>Value</button></div></div>
-        <div className="agingChart">{data.map(item => {
-          const raw = metric === 'Loads' ? item.count : item.value;
-          const width = Math.max(raw ? 8 : 0, (raw / max) * 100);
-          return <div className="agingRow" key={item.label}><span>{item.label}</span><div><i style={{ width: `${width}%` }}/></div><strong>{metric === 'Loads' ? `${item.count} loads` : formatMoney(item.value)}</strong></div>;
-        })}</div>
-      </div>
+    <section className="analytics-grid">
+      <article className="card performance-chart-card">
+        <div className="card-head">
+          <div><span className="eyebrow">Readiness trend</span><h2>Loads becoming invoice-ready</h2><p>Illustrative trend line for the demo conversation.</p></div>
+          <div className="segmented-control"><button className={range === 'Week' ? 'is-active' : ''} onClick={() => setRange('Week')}>Weekly</button><button className={range === 'Month' ? 'is-active' : ''} onClick={() => setRange('Month')}>Monthly</button></div>
+        </div>
+        <div className="chart-summary"><strong>{series.at(-1)}%</strong><span><TrendingUp size={14}/>+11.2% from baseline</span></div>
+        <div className="line-chart">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Invoice readiness trend">
+            <defs><linearGradient id="area" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#111" stopOpacity=".12"/><stop offset="100%" stopColor="#111" stopOpacity="0"/></linearGradient></defs>
+            <polyline points={`0,100 ${points} 100,100`} fill="url(#area)" stroke="none"/>
+            <polyline points={points} fill="none" stroke="#111" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>
+          </svg>
+          <div className="chart-grid-lines"><i/><i/><i/><i/></div>
+        </div>
+      </article>
 
-      <div className="panel analyticsAside">
-        <p className="eyebrow">OPERATING SIGNALS</p><h2>What to watch</h2>
-        <div className="signalList"><div><span>24h SLA</span><strong>{open.filter(load => load.ageHours < 24).length}/{open.length || 0}</strong><small>open exceptions still inside 24 hours</small></div><div><span>Document blockers</span><strong>{open.filter(load => !load.pod || !load.rateCon || !load.carrierInvoice || !load.customerRequirements).length}</strong><small>loads missing at least one billing packet item</small></div><div><span>Accessorial gaps</span><strong>{loads.flatMap(load => load.accessorials).filter(item => item.carrier > item.customer).length}</strong><small>carrier/customer amounts not yet aligned</small></div></div>
-      </div>
+      <article className="card aging-card">
+        <div className="card-head card-head--compact"><div><span className="eyebrow">Exception aging</span><h2>Time waiting</h2></div><Activity size={18}/></div>
+        <div className="aging-bars">
+          {aging.map(item => <div className="aging-row" key={item.label}><span>{item.label}</span><div><i style={{ width: `${Math.max(item.count ? 8 : 0, (item.count / maxAging) * 100)}%` }}/></div><strong>{item.count}</strong></div>)}
+        </div>
+        <div className="analytics-note"><strong>Best demo question</strong><p>“What percentage of delivered loads still need someone to intervene before billing?”</p></div>
+      </article>
     </section>
   </>;
 }

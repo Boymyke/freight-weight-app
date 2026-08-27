@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Check, FileCheck2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { Check, CircleDollarSign, FileCheck2, Paperclip, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
 import { formatMoney } from '@/lib/data';
@@ -10,38 +10,50 @@ import { useDemo } from '@/lib/demo-store';
 
 export default function RevenuePage() {
   const { loads, updateAccessorial } = useDemo();
-  const items = useMemo(() => loads.flatMap(load => load.accessorials.map(item => ({ ...item, loadId: load.id, customerName: load.customer }))), [loads]);
-  const open = items.filter(item => item.carrier > item.customer);
-  const recoverable = open.reduce((sum, item) => sum + (item.carrier - item.customer), 0);
-  const missingEvidence = open.filter(item => !item.evidence).length;
+  const [query, setQuery] = useState('');
+  const opportunities = useMemo(() => loads.flatMap(load => load.accessorials.map(item => ({ ...item, loadId: load.id, customerName: load.customer, lane: load.lane }))).filter(item => item.carrier > item.customer), [loads]);
+  const visible = opportunities.filter(item => `${item.loadId} ${item.customerName} ${item.label}`.toLowerCase().includes(query.toLowerCase()));
+  const totalGap = opportunities.reduce((sum, item) => sum + Math.max(0, item.carrier - item.customer), 0);
+  const evidenceReady = opportunities.filter(item => item.evidence).length;
+  const average = opportunities.length ? Math.round(totalGap / opportunities.length) : 0;
 
   return <>
-    <PageHeader eyebrow="MARGIN WATCH" title="Accessorial recovery" description="Review carrier-side charges that have not yet been matched on the customer billing side."/>
+    <PageHeader eyebrow="Revenue recovery" title="Accessorial review" description="Compare carrier-side charges with the customer billing side before margin slips through the handoff."/>
 
-    <section className="kpiGrid">
-      <StatCard label="Open billing gap" value={formatMoney(recoverable)} note={`${open.length} accessorials need review`} accent />
-      <StatCard label="Missing evidence" value={String(missingEvidence)} note="Supporting documentation still required" />
-      <StatCard label="Matched charges" value={String(items.length - open.length)} note="Carrier and customer sides aligned" />
+    <section className="metrics-grid">
+      <StatCard label="Open billing gap" value={formatMoney(totalGap)} note={`${opportunities.length} charges need review`} icon={CircleDollarSign} tone="dark"/>
+      <StatCard label="Evidence ready" value={`${evidenceReady}/${opportunities.length || 0}`} note="Supporting documentation attached" icon={FileCheck2}/>
+      <StatCard label="Average gap" value={formatMoney(average)} note="Per open accessorial" icon={CircleDollarSign}/>
     </section>
 
-    <section className="panel pagePanel">
-      <div className="panelHeader"><div><p className="eyebrow">ACCESSORIAL REVIEW</p><h2>Carrier vs. customer billing</h2></div><span className="countPill">{open.length} open</span></div>
-      <div className="revenueCards">
-        {open.map(item => {
-          const gap = item.carrier - item.customer;
-          return <article className="revenueCard" key={`${item.loadId}-${item.label}`}>
-            <div className="revenueCardHead"><div><span className="accessorialType">{item.label}</span><Link href={`/loads/${item.loadId}`}>{item.loadId} ↗</Link></div><strong>{formatMoney(gap)}</strong></div>
-            <p>{item.customerName}</p>
-            <div className="revenueCompare"><div><span>Carrier billed</span><strong>{formatMoney(item.carrier)}</strong></div><div><span>Customer billed</span><strong>{formatMoney(item.customer)}</strong></div><div><span>Evidence</span><strong>{item.evidence ? 'Attached' : 'Missing'}</strong></div></div>
-            <div className="revenueActions">
-              {!item.evidence && <button className="secondaryButton compact" onClick={() => updateAccessorial(item.loadId, item.label, { evidence: true })}><FileCheck2 size={14}/> Attach evidence</button>}
-              <button className="primaryButton" onClick={() => updateAccessorial(item.loadId, item.label, { customer: item.carrier, evidence: true, approved: true })}><Check size={14}/> Approve rebill</button>
+    <section className="card revenue-workspace">
+      <div className="revenue-toolbar">
+        <div><span className="eyebrow">Recovery queue</span><h2>Carrier/customer differences</h2></div>
+        <label className="search-field"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search load, customer or charge"/></label>
+      </div>
+
+      <div className="revenue-list">
+        {visible.map(item => {
+          const gap = Math.max(0, item.carrier - item.customer);
+          return <article className="revenue-item" key={`${item.loadId}-${item.label}`}>
+            <div className="revenue-item-main">
+              <span className="revenue-type">{item.label}</span>
+              <div><Link href={`/loads/${item.loadId}`}>{item.loadId} · {item.customerName}</Link><small>{item.lane}</small></div>
+            </div>
+            <div className="revenue-values">
+              <div><span>Carrier billed</span><strong>{formatMoney(item.carrier)}</strong></div>
+              <div><span>Customer billed</span><strong>{formatMoney(item.customer)}</strong></div>
+              <div><span>Gap</span><strong className="text-risk">{formatMoney(gap)}</strong></div>
+            </div>
+            <div className="evidence-chip"><Paperclip size={13}/>{item.evidence ? 'Evidence attached' : 'Evidence missing'}</div>
+            <div className="revenue-item-actions">
+              {!item.evidence && <button className="button button--ghost button--sm" onClick={() => updateAccessorial(item.loadId, item.label, { evidence: true })}><Paperclip size={14}/>Attach evidence</button>}
+              <button className="button button--dark button--sm" onClick={() => updateAccessorial(item.loadId, item.label, { customer: item.carrier, approved: true })}><Check size={14}/>Approve rebill</button>
             </div>
           </article>;
         })}
-        {!open.length && <div className="emptyState roomy"><strong>All accessorials are matched.</strong><span>Use /admin to load a higher-risk demo scenario.</span></div>}
+        {!visible.length && <div className="empty-state"><span>$0</span><strong>No open accessorial gaps</strong><p>Try another search or switch the demo to a higher-risk scenario.</p></div>}
       </div>
     </section>
-    <p className="footnote">“Open billing gap” is a review queue. It does not claim that every dollar is contractually collectible.</p>
   </>;
 }

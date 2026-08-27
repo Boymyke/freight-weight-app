@@ -1,9 +1,0 @@
-{
-  "/analytics/page": "app/analytics/page.js",
-  "/audit/page": "app/audit/page.js",
-  "/exceptions/page": "app/exceptions/page.js",
-  "/loads/[id]/page": "app/loads/[id]/page.js",
-  "/loads/page": "app/loads/page.js",
-  "/page": "app/page.js",
-  "/revenue/page": "app/revenue/page.js"
-}

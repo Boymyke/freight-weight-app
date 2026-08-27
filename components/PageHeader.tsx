@@ -1,6 +1,24 @@
-export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description: string; actions?: React.ReactNode }) {
-  return <header className="pageHeader">
-    <div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1>{title}</h1><p>{description}</p></div>
-    {actions && <div className="pageActions">{actions}</div>}
-  </header>;
+import type { ReactNode } from 'react';
+
+export function PageHeader({
+  eyebrow,
+  title,
+  description,
+  actions,
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <header className="page-header">
+      <div className="page-header-copy">
+        {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+        <h1>{title}</h1>
+        {description && <p>{description}</p>}
+      </div>
+      {actions && <div className="page-header-actions">{actions}</div>}
+    </header>
+  );
 }
