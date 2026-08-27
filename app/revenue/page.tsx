@@ -1,7 +1,47 @@
+'use client';
+
 import Link from 'next/link';
-import { Sidebar } from '@/components/Sidebar';
-import { formatMoney, recoverableAccessorials, recoverableAmount } from '@/lib/data';
+import { Check, FileCheck2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { PageHeader } from '@/components/PageHeader';
+import { StatCard } from '@/components/StatCard';
+import { formatMoney } from '@/lib/data';
+import { useDemo } from '@/lib/demo-store';
 
 export default function RevenuePage() {
-  return <div className="shell"><Sidebar/><main><header className="topbar"><div><p className="eyebrow">MARGIN WATCH</p><h1>Recoverable revenue</h1><p>Carrier-side accessorials that have not yet been reflected on the customer side.</p></div></header><section className="heroMetric"><p>Potential recovery in demo queue</p><strong>{formatMoney(recoverableAmount)}</strong><span>This is a review queue—not a claim that every dollar is collectible.</span></section><section className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">ACCESSORIAL REVIEW</p><h2>Charges requiring billing review</h2></div><span className="pill">{recoverableAccessorials.length} items</span></div><div className="tableWrap"><table><thead><tr><th>Load</th><th>Customer</th><th>Type</th><th>Carrier billed</th><th>Customer billed</th><th>Gap</th><th>Evidence</th></tr></thead><tbody>{recoverableAccessorials.map(a => <tr key={`${a.loadId}-${a.label}`}><td><Link className="loadId" href={`/loads/${a.loadId}`}>{a.loadId}</Link></td><td>{a.customer}</td><td><strong>{a.label}</strong></td><td>{formatMoney(a.carrier)}</td><td>{formatMoney(a.customer)}</td><td><strong className="risk">{formatMoney(a.carrier-a.customer)}</strong></td><td>{a.evidence ? <span className="status ready-to-invoice">Attached</span> : <span className="status blocked">Missing</span>}</td></tr>)}</tbody></table></div></section></main></div>;
+  const { loads, updateAccessorial } = useDemo();
+  const items = useMemo(() => loads.flatMap(load => load.accessorials.map(item => ({ ...item, loadId: load.id, customerName: load.customer }))), [loads]);
+  const open = items.filter(item => item.carrier > item.customer);
+  const recoverable = open.reduce((sum, item) => sum + (item.carrier - item.customer), 0);
+  const missingEvidence = open.filter(item => !item.evidence).length;
+
+  return <>
+    <PageHeader eyebrow="MARGIN WATCH" title="Accessorial recovery" description="Review carrier-side charges that have not yet been matched on the customer billing side."/>
+
+    <section className="kpiGrid">
+      <StatCard label="Open billing gap" value={formatMoney(recoverable)} note={`${open.length} accessorials need review`} accent />
+      <StatCard label="Missing evidence" value={String(missingEvidence)} note="Supporting documentation still required" />
+      <StatCard label="Matched charges" value={String(items.length - open.length)} note="Carrier and customer sides aligned" />
+    </section>
+
+    <section className="panel pagePanel">
+      <div className="panelHeader"><div><p className="eyebrow">ACCESSORIAL REVIEW</p><h2>Carrier vs. customer billing</h2></div><span className="countPill">{open.length} open</span></div>
+      <div className="revenueCards">
+        {open.map(item => {
+          const gap = item.carrier - item.customer;
+          return <article className="revenueCard" key={`${item.loadId}-${item.label}`}>
+            <div className="revenueCardHead"><div><span className="accessorialType">{item.label}</span><Link href={`/loads/${item.loadId}`}>{item.loadId} ↗</Link></div><strong>{formatMoney(gap)}</strong></div>
+            <p>{item.customerName}</p>
+            <div className="revenueCompare"><div><span>Carrier billed</span><strong>{formatMoney(item.carrier)}</strong></div><div><span>Customer billed</span><strong>{formatMoney(item.customer)}</strong></div><div><span>Evidence</span><strong>{item.evidence ? 'Attached' : 'Missing'}</strong></div></div>
+            <div className="revenueActions">
+              {!item.evidence && <button className="secondaryButton compact" onClick={() => updateAccessorial(item.loadId, item.label, { evidence: true })}><FileCheck2 size={14}/> Attach evidence</button>}
+              <button className="primaryButton" onClick={() => updateAccessorial(item.loadId, item.label, { customer: item.carrier, evidence: true, approved: true })}><Check size={14}/> Approve rebill</button>
+            </div>
+          </article>;
+        })}
+        {!open.length && <div className="emptyState roomy"><strong>All accessorials are matched.</strong><span>Use /admin to load a higher-risk demo scenario.</span></div>}
+      </div>
+    </section>
+    <p className="footnote">“Open billing gap” is a review queue. It does not claim that every dollar is contractually collectible.</p>
+  </>;
 }
