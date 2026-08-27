@@ -9,7 +9,6 @@ import {
   Clock3,
   FileCheck2,
   FileWarning,
-  MoreHorizontal,
   Plus,
   ReceiptText,
   RotateCcw,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { StatusPill } from '@/components/StatusPill';
+import { ActionMenu } from '@/components/ActionMenu';
 import { formatMoney } from '@/lib/data';
 import { useDemo } from '@/lib/demo-store';
 
@@ -75,19 +75,19 @@ export default function DashboardPage() {
 
       <section className="reference-summary-grid">
         <article className="reference-summary-card reference-summary-card--primary">
-          <div className="summary-card-top"><div className="summary-title"><span className="summary-icon"><CircleDollarSign size={17}/></span><span><strong>Invoice-ready value</strong><small>Ready for customer billing</small></span></div><button aria-label="More options"><MoreHorizontal size={18}/></button></div>
+          <div className="summary-card-top"><div className="summary-title"><span className="summary-icon"><CircleDollarSign size={17}/></span><span><strong>Invoice-ready value</strong><small>Ready for customer billing</small></span></div><ActionMenu items={[{ label: 'View invoices', href: '/invoices' }, { label: 'View ready loads', href: '/loads?status=Ready%20to%20invoice' }]}/></div>
           <div className="summary-value-row"><strong>{formatMoney(metrics.readyValue)}</strong><span><ArrowUpRight size={11}/>8.4%</span></div>
           <Link href="/loads?status=Ready%20to%20invoice">See details <ArrowRight size={15}/></Link>
         </article>
 
         <article className="reference-summary-card">
-          <div className="summary-card-top"><div className="summary-title"><span className="summary-icon"><FileWarning size={17}/></span><span><strong>Blocked invoice value</strong><small>Waiting on an exception</small></span></div><button aria-label="More options"><MoreHorizontal size={18}/></button></div>
+          <div className="summary-card-top"><div className="summary-title"><span className="summary-icon"><FileWarning size={17}/></span><span><strong>Blocked invoice value</strong><small>Waiting on an exception</small></span></div><ActionMenu items={[{ label: 'View exceptions', href: '/exceptions' }, { label: 'View blocked loads', href: '/loads?status=Blocked' }]}/></div>
           <div className="summary-value-row"><strong>{formatMoney(metrics.blockedValue)}</strong><span><ArrowUpRight size={11}/>3.2%</span></div>
           <Link href="/exceptions">View exceptions <ArrowRight size={15}/></Link>
         </article>
 
         <article className="reference-summary-card">
-          <div className="summary-card-top"><div className="summary-title"><span className="summary-icon"><ReceiptText size={17}/></span><span><strong>Accessorial review</strong><small>Potential recoverable margin</small></span></div><button aria-label="More options"><MoreHorizontal size={18}/></button></div>
+          <div className="summary-card-top"><div className="summary-title"><span className="summary-icon"><ReceiptText size={17}/></span><span><strong>Accessorial review</strong><small>Potential recoverable margin</small></span></div><ActionMenu items={[{ label: 'Open recovery queue', href: '/revenue' }, { label: 'Run revenue audit', href: '/audit' }]}/></div>
           <div className="summary-value-row"><strong>{formatMoney(metrics.accessorialGap)}</strong><span><ArrowUpRight size={11}/>4.7%</span></div>
           <Link href="/revenue">Analyze recovery <ArrowRight size={15}/></Link>
         </article>
@@ -99,12 +99,10 @@ export default function DashboardPage() {
           <div className="wallet-grid">
             {wallet.map(item => {
               const Icon = item.icon;
-              return <Link className="wallet-tile" href={item.href} key={item.label}>
-                <div className="wallet-tile-top"><span className="wallet-symbol"><Icon size={17}/></span><MoreHorizontal size={15}/></div>
-                <strong>{formatMoney(item.value)}</strong>
-                <small>{item.count} loads</small>
-                <em className={item.status === 'Attention' ? 'is-attention' : ''}>{item.status}</em>
-              </Link>;
+              return <article className="wallet-tile" key={item.label}>
+                <div className="wallet-tile-top"><span className="wallet-symbol"><Icon size={17}/></span><ActionMenu label={`${item.label} actions`} items={[{ label: 'View details', href: item.href }, { label: 'Open all loads', href: '/loads' }]}/></div>
+                <Link className="wallet-tile-link" href={item.href}><strong>{formatMoney(item.value)}</strong><small>{item.count} loads</small><em className={item.status === 'Attention' ? 'is-attention' : ''}>{item.status}</em></Link>
+              </article>;
             })}
           </div>
         </article>
@@ -146,7 +144,7 @@ export default function DashboardPage() {
                 <td>{load.customer}</td>
                 <td>{formatMoney(load.amount)}</td>
                 <td><StatusPill status={load.status}/></td>
-                <td><Link className="activity-more" href={`/loads/${load.id}`}><MoreHorizontal size={16}/></Link></td>
+                <td><ActionMenu label={`Actions for ${load.id}`} items={[{ label: 'Open load', href: `/loads/${load.id}` }, { label: 'View invoice queue', href: '/invoices' }]}/></td>
               </tr>)}
             </tbody>
           </table>
