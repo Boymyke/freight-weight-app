@@ -1,0 +1,7 @@
+import { Sidebar } from '@/components/Sidebar';
+import { formatMoney, openLoads, revenueAtRisk } from '@/lib/data';
+
+export default function AnalyticsPage() {
+  const aging = [['0–12 hours', 17, 7800], ['12–24 hours', 21, 12600], ['24–48 hours', 12, 15400], ['48+ hours', 6, 9100]] as const;
+  return <div className="shell"><Sidebar/><main><header className="topbar"><div><p className="eyebrow">ANALYTICS</p><h1>Delivery-to-cash performance</h1><p>Show management where billing friction is accumulating and how quickly teams clear it.</p></div></header><section className="stats statsThree"><div className="statCard"><span>Demo exception rate</span><strong>12.8%</strong><small>56 of 437 delivered loads</small></div><div className="statCard"><span>Open demo exposure</span><strong>{formatMoney(revenueAtRisk)}</strong><small>{openLoads.length} sample load exceptions</small></div><div className="statCard accent"><span>Target metric</span><strong>&lt;24h</strong><small>Delivery → invoice-ready</small></div></section><section className="panel"><div className="panelHeader"><div><p className="eyebrow">EXCEPTION AGING</p><h2>How long delivered revenue stays blocked</h2></div></div><div className="agingGrid">{aging.map(([label, count, amount]) => <div className="agingCard" key={label}><span>{label}</span><strong>{count} loads</strong><small>{formatMoney(amount)} awaiting resolution</small></div>)}</div></section></main></div>;
+}
