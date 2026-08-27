@@ -9,7 +9,8 @@ import { useDemo } from '@/lib/demo-store';
 const labels: Record<string, string> = {
   loads: 'Loads',
   exceptions: 'Exceptions',
-  revenue: 'Invoices',
+  invoices: 'Invoices',
+  revenue: 'Revenue recovery',
   analytics: 'Analytics',
   audit: 'Revenue audit',
   admin: 'Demo controls',
@@ -110,7 +111,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {searchOpen && (
         <div className="command-backdrop" onMouseDown={() => setSearchOpen(false)}>
-          <div className="command-panel" onMouseDown={event => event.stopPropagation()}>
+          <div className="command-panel" role="dialog" aria-modal="true" aria-label="Search loads" onMouseDown={event => event.stopPropagation()}>
             <div className="command-input"><Search size={18}/><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search load number, customer, lane or issue…"/><button onClick={() => setSearchOpen(false)}>Esc</button></div>
             <div className="command-section">
               <span className="command-label">Loads</span>
