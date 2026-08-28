@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Filter, Plus, Search, SlidersHorizontal } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { LoadsTable } from '@/components/LoadsTable';
 import { PageHeader } from '@/components/PageHeader';
 import type { LoadStatus } from '@/lib/data';
@@ -11,7 +11,7 @@ import { useDemo } from '@/lib/demo-store';
 
 const filters: Array<'All' | LoadStatus> = ['All', 'Blocked', 'Review', 'Ready to invoice', 'Invoiced'];
 
-export default function LoadsPage() {
+function LoadsPageContent() {
   const { loads } = useDemo();
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status');
@@ -48,4 +48,8 @@ export default function LoadsPage() {
       <LoadsTable loads={visible}/>
     </section>
   </>;
+}
+
+export default function LoadsPage() {
+  return <Suspense fallback={null}><LoadsPageContent/></Suspense>;
 }
